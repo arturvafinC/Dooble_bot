@@ -1,0 +1,7 @@
+.env/
+.idea/
+.venv/
+.venv1/
+waste_files/transcribate_test.py/
+chat_stats/chat_stats.db/
+waste_files/
