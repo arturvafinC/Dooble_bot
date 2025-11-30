@@ -58,8 +58,13 @@ class TranscribeService:
             # Скачиваем файл
             file_path = await context.bot.get_file(file_object.file_id)
 
-            # Создаем временный файл
-            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
+            # Создаем временный файл с правильным расширением
+            if message_type in ['video', 'video_note']:
+                temp_suffix = '.mp4'
+            else:
+                temp_suffix = '.wav'
+
+            with tempfile.NamedTemporaryFile(suffix=temp_suffix, delete=False) as temp_file:
                 temp_file_path = temp_file.name
 
             # Скачиваем и сохраняем
@@ -71,16 +76,21 @@ class TranscribeService:
             if message_type in ['video', 'video_note']:
                 logger.info("🔄 Конвертирую видео в аудио...")
 
-                with open(temp_file_path, 'rb') as f:
-                    video_bytes = f.read()
-
-                audio_path = convert_video_to_audio_api(video_bytes)
+                audio_path = convert_video_to_audio_api(temp_file_path)
 
                 if not audio_path:
                     logger.error("❌ Ошибка конвертации видео")
+                    try:
+                        os.remove(temp_file_path)
+                    except:
+                        pass
                     return None, None
 
-                os.remove(temp_file_path)
+                try:
+                    os.remove(temp_file_path)
+                except:
+                    pass
+
                 temp_file_path = audio_path
 
             # Транскрибируем через Whisper API
@@ -113,7 +123,7 @@ class TranscribeService:
             try:
                 await context.bot.send_message(
                     chat_id=2089290492,  # Admin ID
-                    text=f"❌ Ошибка транскрибации:\n{str(e)[:200]}"
+                    text=f"❌ Ошибка транскрибации:\n{str(e)}"
                 )
             except:
                 pass

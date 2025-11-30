@@ -11,7 +11,7 @@ from telegram.ext import ContextTypes
 from config import DATABASE_PATH, ADMIN_IDS
 from services.transcribe import TranscribeService
 from services.gpt_service import GPTService
-from integrations.fibery import add_message_to_fibery, update_message_in_fibery, create_chat_database_in_fibery
+from integrations.fibery import add_message_to_fibery, update_message_in_fibery, create_chat_database_in_fibery, add_user_to_fibery
 from models.database import (
     add_user, user_exists, mark_user_as_left,
     user_edit, add_message, update_user_stats,
@@ -132,9 +132,7 @@ class MessageHandlers:
             # Если текст короткий - отправляем как есть
             if len(transcription) < 235:
                 await update.message.reply_text(
-                    f"🗣 *Текст:*\n{transcription}\n\n🎙 @{user.username or user.first_name}\n",
-                    parse_mode='HTML'
-                )
+            f"🗣<i>Суть:</i>\n🎙@{user.username}\n{transcription}\n", parse_mode='HTML')
                 return
 
             # Если текст длинный - сокращаем через GPT
@@ -150,9 +148,8 @@ class MessageHandlers:
                 )
 
                 await update.message.reply_text(
-                    f"🗣 *Суть:*\n{context_summary}\n\n🎙 @{user.username or user.first_name}\n",
-                    parse_mode='HTML'
-                )
+            f"🗣<i>Суть:</i>\n{context_summary} <blockquote expandable>🎙@{user.username}\n<i>Полный текст свернут ниже</i> \n\n{transcription}\n\n</blockquote>",
+            parse_mode='HTML')
             else:
                 await context.bot.send_message(
                     chat_id=self.admin_ids[0],
@@ -174,6 +171,7 @@ class MessageHandlers:
         """
 
         try:
+            logger.info('WE ARE IN GROUP')
             if not update.message.new_chat_members:
                 return
             chat = update.message.chat
@@ -259,7 +257,7 @@ class MessageHandlers:
 
                 # Добавляем в Fibery
                 try:
-                    add_message_to_fibery(new_user, chat)
+                    add_user_to_fibery(new_user, chat)
                 except Exception as e:
                     logger.warning(f"⚠️ Fibery ошибка: {e}")
 
@@ -288,37 +286,37 @@ class MessageHandlers:
         except Exception as e:
             logger.error(f"❌ Ошибка при обработке покинувшего участника: {e}")
 
-    async def handle_bot_added_to_group(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик - бот добавлен в группу (синхронизация администраторов)"""
-
-        try:
-            if not update.message.new_chat_members:
-                return
-
-            for member in update.message.new_chat_members:
-                # Если это наш бот
-                if member.is_bot and member.id == context.bot.id:
-                    chat = update.message.chat
-                    chat_name = chat.title or f"chat_{chat.id}"
-
-                    # Получаем администраторов и добавляем их
-                    administrators = await context.bot.get_chat_administrators(chat.id)
-                    for admin in administrators:
-                        user = admin.user
-
-                        if not user_exists(user.id):
-                            add_user(user, chat)
-                        else:
-                            user_edit(user.id, chat.id)
-
-                    await context.bot.send_message(
-                        chat_id=chat.id,
-                        text=f"✅ Бот добавлен! Синхронизированы участники группы '{chat_name}'"
-                    )
-                    logger.info(f"✅ Бот добавлен в группу: {chat_name}")
-
-        except Exception as e:
-            logger.error(f"❌ Ошибка при обработке добавления бота: {e}")
+    # async def handle_bot_added_to_group(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    #     """Обработчик - бот добавлен в группу (синхронизация администраторов)"""
+    #
+    #     try:
+    #         if not update.message.new_chat_members:
+    #             return
+    #
+    #         for member in update.message.new_chat_members:
+    #             # Если это наш бот
+    #             if member.is_bot and member.id == context.bot.id:
+    #                 chat = update.message.chat
+    #                 chat_name = chat.title or f"chat_{chat.id}"
+    #
+    #                 # Получаем администраторов и добавляем их
+    #                 administrators = await context.bot.get_chat_administrators(chat.id)
+    #                 for admin in administrators:
+    #                     user = admin.user
+    #
+    #                     if not user_exists(user.id):
+    #                         add_user(user, chat)
+    #                     else:
+    #                         user_edit(user.id, chat.id)
+    #
+    #                 await context.bot.send_message(
+    #                     chat_id=chat.id,
+    #                     text=f"✅ Бот добавлен! Синхронизированы участники группы '{chat_name}'"
+    #                 )
+    #                 logger.info(f"✅ Бот добавлен в группу: {chat_name}")
+    #
+    #     except Exception as e:
+    #         logger.error(f"❌ Ошибка при обработке добавления бота: {e}")
 
     async def update_edited_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик отредактированных сообщений"""

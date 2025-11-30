@@ -184,7 +184,7 @@ def add_user_to_fibery(user, chat):
     for key, value in FIBERY_DATA_DICT_USERS.items():
         FIBERY_DATA_DICT_USERS[key] = parametrs[counter]
         counter += 1
-    send_data(FIBERY_DATA_DICT_USERS, 'users')
+    send_data(FIBERY_DATA_DICT_USERS, 'users', additional_table=real_table_name)
 
 
 def add_message_to_fibery(message, message_type, transcription='', context_voice=''):
@@ -293,7 +293,7 @@ def create_chat_database_in_fibery(chat_id):
         'fields': fields
     }
 
-    main_data = [{"command": "fibery.database/create", "args": args_dict}]
+    main_data = [{"command": "schema.type/create", "args": args_dict}]
 
     try:
         response = requests.post(POST_ENDPOINT, headers=headers, json=main_data)

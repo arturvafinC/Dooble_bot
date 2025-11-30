@@ -46,7 +46,6 @@ class GPTService:
             # Выбираем модель в зависимости от длины текста
             model = self._select_model_by_length(len(text))
 
-            # Отправляем запрос к ChatGPT
             response = self.client.chat.completions.create(
                 model=model,
                 messages=[
@@ -58,10 +57,7 @@ class GPTService:
                         "role": "user",
                         "content": text
                     }
-                ],
-                temperature=0.3,  # Низкая температура для консистентности
-                max_tokens=200,  # Максимум 200 токенов
-                top_p=0.9
+                ]
             )
 
             summary = response.choices[0].message.content.strip()
@@ -160,7 +156,6 @@ class GPTService:
                     {"role": "user", "content": text}
                 ],
                 temperature=0.1,
-                max_tokens=10
             )
 
             priority = response.choices[0].message.content.strip().upper()

@@ -38,7 +38,7 @@ class MessageStatsBot:
         self.application.add_handler(
             MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS,
                            self.message_handlers.handle_new_chat_members),
-            group=0
+            group=1
         )
 
         # 2️⃣ ОБРАБОТЧИК ПОКИНУВШИХ УЧАСТНИКОВ (группа 0)
