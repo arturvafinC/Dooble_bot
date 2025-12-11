@@ -9,6 +9,11 @@ from handlers.message_handlers import MessageHandlers
 from handlers.command_handlers import CommandHandlers
 from handlers.button_handlers import ButtonHandlers
 from config import TELEGRAM_BOT_TOKEN
+from handlers.daily_stats_handler import DailyStatsHandlers
+from services.daily_stats_service import DailyStatsService
+import pytz
+import datetime
+
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +33,21 @@ class MessageStatsBot:
         self.message_handlers = MessageHandlers(admin_ids)
         self.command_handlers = CommandHandlers(admin_ids)
         self.button_handlers = ButtonHandlers(admin_ids)
+        self.daily_stats_handlers = DailyStatsHandlers(admin_ids)
+
+    def setup_job_queue(self):
+        job_queue = self.application.job_queue
+        tz = pytz.timezone('Europe/Moscow')
+
+        logger.info("⏰ Настраиваю планировщик задач...")
+
+        job_queue.run_daily(
+            callback=self.daily_stats_handlers.scheduled_daily_stats,
+            time=datetime.time(hour=0, minute=1, tzinfo=tz),
+            name='daily_stats_job'
+        )
+
+        logger.info("✅ Планировщик задач настроен (ежедневно в 00:01)")
 
     def _register_handlers(self):
         """Регистрация всех обработчиков в приложении"""
@@ -100,6 +120,10 @@ class MessageStatsBot:
             CallbackQueryHandler(self.button_handlers.button_callback)
         )
 
+        self.application.add_handler(
+            CommandHandler('daily_stats', self.daily_stats_handlers.daily_stats_command)
+        )
+
         logger.info("✅ Обработчики зарегистрированы")
 
     def run(self):
@@ -111,6 +135,7 @@ class MessageStatsBot:
 
         # Регистрируем обработчики
         self._register_handlers()
+        self.setup_job_queue()
 
         logger.info("🚀 Запускаю polling...")
 

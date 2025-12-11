@@ -19,6 +19,7 @@ from models.database import (
     get_user_rights, create_chat_table,
     ensure_chat_table_exists
 )
+from utils.tiktok import count_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ class MessageHandlers:
 
             # Добавляем как Guest
             add_user_to_chat_table(user, chat_id, users_rights='Guest')
-
+            add_user_to_fibery(user, chat_id)
             # Опционально: уведомляем админа
             try:
                 await context.bot.send_message(
@@ -137,14 +138,15 @@ class MessageHandlers:
 
             # Если текст длинный - сокращаем через GPT
             context_summary = await self.gpt_service.summarize(transcription, duration)
-
+            text_to_count_tokens = transcription + context_summary
             if context_summary:
                 # Сохраняем транскрибацию и сокращение в БД
                 self._update_transcription_in_db(
                     message.message_id,
                     message.chat_id,
                     transcription,
-                    context_summary
+                    context_summary,
+                    count_tokens(text_to_count_tokens)
                 )
 
                 await update.message.reply_text(
@@ -171,7 +173,6 @@ class MessageHandlers:
         """
 
         try:
-            logger.info('WE ARE IN GROUP')
             if not update.message.new_chat_members:
                 return
             chat = update.message.chat
@@ -264,6 +265,7 @@ class MessageHandlers:
                 # Добавляем в БД
                 if not user_exists(new_user.id):
                     add_user(new_user, chat)
+                    add_user_to_fibery(new_user, chat)
                     logger.info(f"👤 Новый пользователь: {new_user.first_name} ({new_user.id})")
                 else:
                     user_edit(new_user.id, chat.id)
@@ -404,7 +406,8 @@ class MessageHandlers:
             message_id: int,
             chat_id: int,
             transcription: str,
-            context_summary: str
+            context_summary: str,
+            tokens: int
     ):
         """Обновляем транскрибацию в БД"""
 
@@ -413,9 +416,9 @@ class MessageHandlers:
                 cursor = conn.cursor()
                 cursor.execute(
                     """UPDATE message_history
-                       SET transcription = ?, context_voice = ?
+                       SET transcription = ?, context_voice = ?, tokens = tokens + ?
                        WHERE message_id = ? AND chat_id = ?""",
-                    (transcription, context_summary, message_id, chat_id)
+                    (transcription, context_summary, tokens, message_id, chat_id)
                 )
                 conn.commit()
                 logger.info(f"✅ Транскрибация сохранена: {message_id}")

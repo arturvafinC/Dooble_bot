@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, List, Tuple
 from config import DATABASE_PATH
-
+from utils.tiktok import count_tokens
 import logging
 
 logger = logging.getLogger(__name__)
@@ -67,6 +67,7 @@ def init_database():
             context_voice TEXT,
             message_date TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            tokens INTEGER DEFAULT 0,
             UNIQUE(message_id, chat_id)
         );
 
@@ -264,8 +265,8 @@ def add_message(message, message_type: str, context, update):
             cursor.execute("""
                 INSERT INTO message_history
                 (message_id, chat_id, user_id, username, first_name, last_name,
-                 message_type, message_text, file_id, file_name, caption, message_date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 message_type, message_text, file_id, file_name, caption, tokens, message_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 message.message_id,
                 message.chat_id,
@@ -278,6 +279,7 @@ def add_message(message, message_type: str, context, update):
                 file_id,
                 file_name,
                 message.caption or '',
+                count_tokens(message_text),
                 datetime.fromtimestamp(message.date.timestamp())
             ))
 

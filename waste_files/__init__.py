@@ -1,13 +1,30 @@
-if transcription:
-    if len(transcription) < 235:
-        await update.message.reply_text(
-            f"🗣<i>Суть:</i>\n🎙@{user.username}\n{transcription}\n",
-            parse_mode='HTML')
-        return
-    # Обновляем БД с транскрибацией
-    context_voice = await self.get_context(transcription, duration)
-    if context_voice:
-        self.update_message_transcription(message.message_id, message.chat_id, transcription, context_voice)
-        await update.message.reply_text(
-            f"🗣<i>Суть:</i>\n{context_voice} <blockquote expandable>🎙@{user.username}\n<i>Полный текст свернут ниже</i> \n\n{transcription}\n\n</blockquote>",
-            parse_mode='HTML')
+import sqlite3
+
+
+def add_tokens_column(database_path, table_name):
+    """
+    Добавляет столбец tokens типа INTEGER с значением по умолчанию 0
+
+    Args:
+        database_path (str): Путь к базе данных SQLite
+        table_name (str): Название таблицы
+    """
+    try:
+        connection = sqlite3.connect(database_path)
+        cursor = connection.cursor()
+
+        # SQL запрос для добавления столбца
+        query = f"ALTER TABLE {table_name} ADD COLUMN tokens INTEGER DEFAULT 0"
+        cursor.execute(query)
+
+        connection.commit()
+        print(f"Столбец 'tokens' успешно добавлен в таблицу '{table_name}'")
+
+    except sqlite3.OperationalError as e:
+        print(f"Ошибка: {e}")
+    finally:
+        connection.close()
+
+
+# Пример использования:
+add_tokens_column("/Users/artur/PycharmProjects/dooble_bot_v2/chat_stats.db", "message_history")
