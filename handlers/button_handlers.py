@@ -7,6 +7,8 @@ import sqlite3
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from config import DATABASE_PATH
+from services.user_weekly_context_service import get_user_weekly_context
+
 
 logger = logging.getLogger(__name__)
 
@@ -42,14 +44,22 @@ class ButtonHandlers:
 
         if callback_type == 'user':
             await self._handle_user_button(query, context)
+        elif callback_type == 'chat':
+            await self._handle_chat_button(query, context)
         elif callback_type == 'page':
             await self._handle_page_button(query, context)
+        elif callback_type == 'chat_page':
+            await self._handle_page_button_chats(query, context)
         elif callback_type == 'action':
             await self._handle_action_button(query, context)
         elif callback_type == 'grant':
             await self._handle_grant_button(query, context)
         elif callback_type == 'revoke':
             await self._handle_revoke_button(query, context)
+        elif callback_type == 'context':
+            await self._handle_user_context(query, context)
+        elif callback_type == 'chat_context':
+            await self._handle_chat_context(query, context)
         else:
             logger.warning(f"⚠️ Неизвестный тип callback: {callback_type}")
 
@@ -99,6 +109,8 @@ class ButtonHandlers:
                     InlineKeyboardButton("✅ Дать права", callback_data=f"grant:{tg_id}")
                 ])
 
+            keyboard.append([InlineKeyboardButton("📊 Получить недельный контекст", callback_data=f"context:{user_id}")])
+
             keyboard.append([
                 InlineKeyboardButton("« Назад", callback_data="page:0")
             ])
@@ -112,6 +124,65 @@ class ButtonHandlers:
         except Exception as e:
             logger.error(f"❌ Ошибка в _handle_user_button: {e}")
             await query.edit_message_text(f"❌ Ошибка: {str(e)[:100]}")
+
+    async def _handle_user_context(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Получает и выводит недельный контекст пользователя"""
+        try:
+            # Парсим user_id
+            user_id = int(query.data.split(':')[1])
+            chat_id = query.message.chat_id
+            print(chat_id, user_id)
+            # Получаем данные пользователя из БД
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT telegram_id, telegram_username, telegram_first_name,
+                           telegram_last_name, users_rights
+                    FROM users WHERE telegram_id = ?
+                """, (user_id,))
+
+                result = cursor.fetchone()
+
+            if not result:
+                await query.edit_message_text("❌ Пользователь не найден")
+                return
+
+            tg_id, username, first_name, last_name, rights = result
+
+            # Показываем "loading"
+            await query.edit_message_text("⏳ Анализирую активность пользователя за неделю...")
+
+            # Вызываем функцию из сервиса
+            result_text = await get_user_weekly_context(
+                chat_id=None,
+                user_id=user_id,
+                username=username or str(user_id),
+                first_name=first_name or "Пользователь"
+            )
+
+            if result_text:
+                # Добавляем кнопку "Назад"
+                keyboard = [
+                    [InlineKeyboardButton("« Назад", callback_data=f"user:{user_id}")]
+                ]
+
+                await query.edit_message_text(
+                    result_text,
+                    parse_mode='HTML',
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+                logger.info(f"✅ Контекст получен для пользователя {user_id}")
+            else:
+                await query.edit_message_text(
+                    "❌ Не удалось получить контекст пользователя",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("« Назад", callback_data=f"user:{user_id}")]
+                    ])
+                )
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка в _handle_user_context: {e}")
+            await query.edit_message_text(f"❌ Ошибка при анализе: {str(e)[:100]}")
 
     async def _handle_page_button(self, query, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик навигации по страницам"""
@@ -270,55 +341,194 @@ class ButtonHandlers:
             logger.error(f"❌ Ошибка в _handle_revoke_button: {e}")
             await query.answer(f"❌ Ошибка: {str(e)}", show_alert=True)
 
+    async def _handle_page_button_chats(self, query, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик навигации по страницам"""
 
-# ============================================================
-# ЗАКОММЕНТИРОВАННЫЕ ФУНКЦИИ (для будущего использования)
-# ============================================================
+        try:
+            page = int(query.data.split(':')[1])
 
-"""
-# Если нужны inline кнопки в сообщениях:
+            # Получаем пользователей с пагинацией
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cursor = conn.cursor()
 
-def make_quick_stats_keyboard():
-    '''Быстрые кнопки для статистики'''
-    keyboard = [
-        [
-            InlineKeyboardButton("📊 Топ-10", callback_data="stats:top10"),
-            InlineKeyboardButton("👤 Мои", callback_data="stats:mystats"),
-        ],
-        [
-            InlineKeyboardButton("📤 Экспорт", callback_data="action:export"),
-            InlineKeyboardButton("🔄 Обновить", callback_data="action:refresh"),
-        ]
-    ]
-    return InlineKeyboardMarkup(keyboard)
+                # Получаем всех пользователей
+                cursor.execute("""
+                    SELECT chat_id, chat_name, table_name, created_at
+                    FROM chats_registry
+                    ORDER BY created_at DESC
+                """)
+
+                all_chats = cursor.fetchall()
+
+            if not all_chats:
+                await query.edit_message_text("📭 Нет пользователей в БД")
+                return
+
+            # Пагинация
+            per_page = 10
+            total_pages = (len(all_chats) - 1) // per_page + 1
+
+            if page >= total_pages:
+                page = total_pages - 1
+            if page < 0:
+                page = 0
+
+            start_idx = page * per_page
+            end_idx = start_idx + per_page
+
+            page_chats = all_chats[start_idx:end_idx]
+
+            # Формируем текст
+            text = f"👥 **Чаты (страница {page + 1}/{total_pages}):**\n\n"
+
+            keyboard = []
+
+            for chat_id, chat_name, table_name, created_at in page_chats:
+                label = f"{chat_name or ''}".strip()
 
 
-# Если нужны подтверждения действий:
-
-async def confirm_delete_user(query, user_id):
-    '''Подтверждение удаления пользователя'''
-    keyboard = [
-        [
-            InlineKeyboardButton("✅ Да, удалить", callback_data=f"delete_confirm:{user_id}"),
-            InlineKeyboardButton("❌ Отмена", callback_data="cancel"),
-        ]
-    ]
-
-    await query.edit_message_text(
-        "⚠️ Вы уверены?",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+                label = label or f"ID {chat_id}"
 
 
-# Если нужны рейтинги/голосование:
+                keyboard.append([
+                    InlineKeyboardButton(
+                        f"{label}",
+                        callback_data=f"chat:{chat_id}"
+                    )
+                ])
 
-def make_rating_keyboard(item_id):
-    '''Кнопки для рейтинга'''
-    keyboard = [
-        [
-            InlineKeyboardButton("👍 Нравится", callback_data=f"rate:like:{item_id}"),
-            InlineKeyboardButton("👎 Не нравится", callback_data=f"rate:dislike:{item_id}"),
-        ]
-    ]
-    return InlineKeyboardMarkup(keyboard)
-"""
+            # Кнопки навигации
+            nav_buttons = []
+
+            if page > 0:
+                nav_buttons.append(
+                    InlineKeyboardButton("« Назад", callback_data=f"page:{page - 1}")
+                )
+
+            if page < total_pages - 1:
+                nav_buttons.append(
+                    InlineKeyboardButton("Вперед »", callback_data=f"page:{page + 1}")
+                )
+
+            if nav_buttons:
+                keyboard.append(nav_buttons)
+
+            text += f"Всего: {len(all_chats)} пользователей\n"
+
+            await query.edit_message_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка в _handle_page_button: {e}")
+            await query.edit_message_text(f"❌ Ошибка: {str(e)[:100]}")
+
+
+    async def _handle_chat_button(self, query, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик нажатия на пользователя"""
+
+        try:
+            chat_id = int(query.data.split(':')[1])
+
+            # Получаем информацию о пользователе
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT chat_name, table_name, created_at
+                    FROM chats_registry WHERE chat_id = ?
+                """, (chat_id,))
+
+                result = cursor.fetchone()
+
+            if not result:
+                await query.edit_message_text("❌ таблица не найдена")
+                return
+
+            chat_name, table_name, created_ats = result
+
+            text = (
+                "Информация о чате:\n\n"
+                f"ID: {chat_id}\n"
+                f"Имя: {chat_name or 'N/A'}\n"
+                f"Таблица: {table_name or 'N/A'}\n"
+                f"Создан: {created_ats or 'N/A'}\n\n"
+                "Действия:\n"
+            )
+
+            # Формируем кнопки в зависимости от текущих прав
+            keyboard = []
+
+
+
+            keyboard.append([InlineKeyboardButton("📊 Получить недельный контекст", callback_data=f"chat_context:{chat_id}")])
+
+            keyboard.append([
+                InlineKeyboardButton("« Назад", callback_data="chat_page:0")
+            ])
+
+            await query.edit_message_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка в _handle_user_button: {e}")
+            await query.edit_message_text(f"❌ Ошибка: {str(e)[:100]}")
+
+    async def _handle_chat_context(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Получает и выводит недельный контекст чата"""
+        try:
+            from services.chat_weekly_context_service import get_chat_weekly_context
+
+            # Парсим chat_id
+            chat_id = int(query.data.split(':')[1])
+
+            # Получаем данные чата из БД
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT chat_name, table_name, created_at
+                    FROM chats_registry WHERE chat_id = ?
+                """, (chat_id,))
+
+                result = cursor.fetchone()
+
+            if not result:
+                await query.edit_message_text("❌ Чат не найден")
+                return
+
+            chat_name, table_name, created_at = result
+
+            # Показываем "loading"
+            await query.edit_message_text("⏳ Анализирую активность чата за неделю...")
+
+            # Получаем анализ
+            result_text = await get_chat_weekly_context(
+                chat_id=chat_id,
+                chat_name=chat_name
+            )
+
+            if result_text:
+                keyboard = [
+                    [InlineKeyboardButton("« Назад", callback_data=f"chat:{chat_id}")]
+                ]
+
+                await query.edit_message_text(
+                    result_text,
+                    parse_mode=None,
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+                logger.info(f"✅ Контекст получен для чата {chat_id}")
+            else:
+                await query.edit_message_text(
+                    "❌ Не удалось получить контекст чата",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("« Назад", callback_data=f"chat:{chat_id}")]
+                    ])
+                )
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка в _handle_chat_context: {e}")
+            await query.edit_message_text(f"❌ Ошибка при анализе: {str(e)[:100]}")
+

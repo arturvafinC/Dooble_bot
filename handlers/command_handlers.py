@@ -9,7 +9,7 @@ from typing import Tuple, List
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from config import DATABASE_PATH
-from models.database import get_all_users, count_users
+from models.database import get_all_users, count_users, get_all_chats
 
 logger = logging.getLogger(__name__)
 
@@ -286,6 +286,24 @@ class CommandHandlers:
             reply_markup=keyboard
         )
 
+    async def admin_chats_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        👥 /users - Управление пользователями (для администраторов)
+        """
+
+        if not update.message or update.effective_user.id not in self.admin_ids:
+            return
+
+        total = count_users()
+        page = 0
+
+        keyboard = self._make_chats_keyboard(page, total)
+
+        await update.message.reply_text(
+            "Выберите пользователя:",
+            reply_markup=keyboard
+        )
+
     async def add_list_of_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         ➕ /add_list_of_user @nick1 @nick2 - Добавить список пользователей
@@ -346,6 +364,37 @@ class CommandHandlers:
             nav_buttons.append(InlineKeyboardButton("« Назад", callback_data=f"page:{page - 1}"))
         if page < max_page:
             nav_buttons.append(InlineKeyboardButton("Вперед »", callback_data=f"page:{page + 1}"))
+
+        if nav_buttons:
+            keyboard.append(nav_buttons)
+
+        return InlineKeyboardMarkup(keyboard)
+
+    def _make_chats_keyboard(self, page: int, total: int) -> InlineKeyboardMarkup:
+        """Создает клавиатуру со списком пользователей"""
+
+        users = get_all_chats(skip=page * 10, limit=10)
+        keyboard = []
+
+        # Кнопки пользователей
+        for chat_id, chat_name, table_name, created_at in users:
+            label = f"{chat_name or ''}".strip()
+
+            keyboard.append([
+                InlineKeyboardButton(
+                    label or f"{chat_id}",
+                    callback_data=f"chat:{chat_id}"
+                )
+            ])
+
+        # Навигация
+        nav_buttons = []
+        max_page = (total - 1) // 10
+
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("« Назад", callback_data=f"chat_page:{page - 1}"))
+        if page < max_page:
+            nav_buttons.append(InlineKeyboardButton("Вперед »", callback_data=f"chat_page:{page + 1}"))
 
         if nav_buttons:
             keyboard.append(nav_buttons)

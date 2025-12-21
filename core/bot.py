@@ -13,6 +13,8 @@ from handlers.daily_stats_handler import DailyStatsHandlers
 from services.daily_stats_service import DailyStatsService
 import pytz
 import datetime
+from handlers.get_weekly_context_handler import setup_weekly_scheduler, weekly_summary_command
+from services.context_cache_service import init_context_tables, update_context_tables_allow_null
 
 
 logger = logging.getLogger(__name__)
@@ -28,6 +30,8 @@ class MessageStatsBot:
 
         # Инициализируем БД
         init_database()
+        init_context_tables()
+        #update_context_tables_allow_null()
 
         # Инициализируем обработчики (они наследуют admin_ids)
         self.message_handlers = MessageHandlers(admin_ids)
@@ -111,6 +115,10 @@ class MessageStatsBot:
             group=1
         )
         self.application.add_handler(
+            CommandHandler('chats', self.command_handlers.admin_chats_menu),
+            group=1
+        )
+        self.application.add_handler(
             CommandHandler('add_list_of_user', self.command_handlers.add_list_of_user),
             group=1
         )
@@ -123,6 +131,9 @@ class MessageStatsBot:
         self.application.add_handler(
             CommandHandler('daily_stats', self.daily_stats_handlers.daily_stats_command)
         )
+
+        self.application.add_handler(CommandHandler('weekly_summary', weekly_summary_command))
+        setup_weekly_scheduler(self.application)
 
         logger.info("✅ Обработчики зарегистрированы")
 

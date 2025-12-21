@@ -91,7 +91,6 @@ def init_database():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-
         """)
 
     print("✅ База данных инициализирована")
@@ -204,6 +203,25 @@ def get_all_users(skip: int = 0, limit: int = 10) -> List[Tuple]:
             return cursor.fetchall()
     except Exception as e:
         print(f"❌ Ошибка при получении пользователей: {e}")
+        return []
+
+
+def get_all_chats(skip: int = 0, limit: int = 10) -> List[Tuple]:
+    """Получить всех пользователей с пагинацией"""
+
+    try:
+        with sqlite3.connect(DATABASE_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT chat_id, chat_name, table_name, created_at
+                FROM chats_registry
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+            """, (limit, skip))
+
+            return cursor.fetchall()
+    except Exception as e:
+        print(f"❌ Ошибка при получении чатов: {e}")
         return []
 
 
@@ -608,3 +626,12 @@ def ensure_chat_table_exists(chat_id: int, chat_title: str = None):
         print(f"❌ Ошибка при проверке таблицы чата: {e}")
         return None
 
+
+def save_weekly_summary(summary):
+    with sqlite3.connect(DATABASE_PATH) as conn:
+        cursor = conn.cursor()
+
+        # Проверяем существует ли таблица
+        cursor.execute("""
+            INSERT INTO weekly_summary 
+        """, (summary,))
