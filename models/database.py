@@ -88,6 +88,7 @@ def init_database():
             telegram_added_to_attachment_menu BOOLEAN,
             user_group_id INTEGER,
             users_rights TEXT DEFAULT 'User',
+            user_priority INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -635,3 +636,5 @@ def save_weekly_summary(summary):
         cursor.execute("""
             INSERT INTO weekly_summary 
         """, (summary,))
+
+

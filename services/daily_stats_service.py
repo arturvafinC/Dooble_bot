@@ -17,53 +17,32 @@ class DailyStatsService:
     async def get_daily_stats(self) -> Dict[int, Dict]:
         """
         📊 Получить статистику за последние 24 часа по каждому чату
-
-        Returns:
-            {
-                chat_id: {
-                    'chat_name': str,
-                    'users_stats': [
-                        {
-                            'user_id': int,
-                            'first_name': str,
-                            'last_name': str,
-                            'username': str,
-                            'total_messages': int,
-                            'video_note_count': int,
-                            'transcription_count': int,
-                            ...
-                        },
-                        ...
-                    ],
-                    'total_messages': int,
-                    'period': str
-                }
-            }
+        Исправлено: формат даты и подсчет суммы сообщений
         """
-
         try:
-            # Получаем дату начала периода (24 часа назад)
             end_time = datetime.now()
             start_time = end_time - timedelta(days=1)
 
-            logger.info(f"📊 Собираю статистику за период: {start_time} - {end_time}")
+            # 🛠 FIX: Используем формат с пробелом, как в БД, вместо isoformat() (с 'T')
+            # Иначе строковое сравнение в SQLite будет работать неправильно
+            start_str = start_time.strftime("%Y-%m-%d %H:%M:%S.%f")
+            end_str = end_time.strftime("%Y-%m-%d %H:%M:%S.%f")
+
+            logger.info(f"📊 Собираю статистику за период: {start_str} - {end_str}")
 
             stats_by_chat = {}
 
             with sqlite3.connect(self.database_path) as conn:
                 cursor = conn.cursor()
 
-                # Получаем все зарегистрированные чаты
                 cursor.execute("""
                     SELECT chat_id, chat_name, table_name
                     FROM chats_registry
                     ORDER BY created_at DESC
                 """)
-
                 chats = cursor.fetchall()
 
                 for chat_id, chat_name, table_name in chats:
-                    # Получаем статистику для каждого чата
                     cursor.execute(f"""
                         SELECT 
                             user_id,
@@ -77,21 +56,20 @@ class DailyStatsService:
                         AND created_at <= ?
                         GROUP BY user_id
                         ORDER BY total_messages DESC
-                    """, (chat_id, start_time.isoformat(), end_time.isoformat()))
+                    """, (chat_id, start_str, end_str))
 
                     user_stats = cursor.fetchall()
 
                     if user_stats:
+                        # 🛠 FIX: Суммируем только количество сообщений (5-й элемент), а не весь кортеж
                         total_messages = sum(stat[4] for stat in user_stats)
 
-                        # Собираем детальную информацию для каждого пользователя
                         users_stats_list = []
                         for stat in user_stats:
                             user_id, first_name, last_name, username, total = stat
 
-                            # Получаем подробную статистику по типам сообщений
                             video_note_count, transcription_count = self._get_message_type_counts(
-                                cursor, chat_id, user_id, start_time, end_time
+                                cursor, chat_id, user_id, start_str, end_str
                             )
 
                             users_stats_list.append({
@@ -113,9 +91,6 @@ class DailyStatsService:
                             'period_end': end_time.strftime("%Y-%m-%d %H:%M")
                         }
 
-                        logger.info(
-                            f"✅ Статистика для {chat_name}: {total_messages} сообщений от {len(user_stats)} пользователей")
-
             return stats_by_chat
 
         except Exception as e:
@@ -123,12 +98,10 @@ class DailyStatsService:
             return {}
 
     def _get_message_type_counts(self, cursor, chat_id: int, user_id: int,
-                                 start_time: datetime, end_time: datetime) -> Tuple[int, int]:
+                                 start_str: str, end_str: str) -> Tuple[int, int]:
         """
-        🎙️ Получить подсчет кружков (video_note) и транскрибаций (audio + video_note)
-
-        Returns:
-            (video_note_count, transcription_count)
+        🎙️ Получить подсчет кружков и транскрибаций
+        Принимает уже отформатированные строки даты
         """
         try:
             cursor.execute("""
@@ -141,32 +114,26 @@ class DailyStatsService:
                 AND created_at >= ?
                 AND created_at <= ?
                 GROUP BY message_type
-            """, (chat_id, user_id, start_time.isoformat(), end_time.isoformat()))
+            """, (chat_id, user_id, start_str, end_str))
 
             message_types = cursor.fetchall()
 
             video_note_count = 0
             audio_count = 0
 
-            for row in message_types:
-                # Безопасное получение данных
-                msg_type, count = row
-
-                print(msg_type, count)
+            # 🛠 FIX: Правильная распаковка кортежа (type, count)
+            for msg_type, count in message_types:
                 if msg_type == 'video_note':
                     video_note_count = count
-                    print(count, 'Кружек')
                 elif msg_type == 'audio_message':
                     audio_count = count
 
-            # Транскрибации = видеокружки + аудио
-            transcription_count = video_note_count + audio_count
-            print(video_note_count, transcription_count)
-            return video_note_count, transcription_count
+            return video_note_count, video_note_count + audio_count
 
         except Exception as e:
             logger.error(f"❌ Ошибка при получении типов сообщений: {e}")
             return 0, 0
+
 
     def format_stats_message(self, stats_by_chat: Dict[int, Dict]) -> List[str]:
         """

@@ -1,7 +1,7 @@
 # ============================================================
 # SERVICES/TRANSCRIBE.PY - Транскрибация голоса/видео
 # ============================================================
-
+import re
 import logging
 import tempfile
 import os
@@ -96,14 +96,57 @@ class TranscribeService:
             # Транскрибируем через Whisper API
             logger.info("📝 Отправляю на транскрибацию...")
 
+            # Список типичных русских галлюцинаций (можно дополнить)
+            HALLUCINATION_PATTERNS = [
+                r"редактор\s+субтитров",
+                r"корректор",
+                r"субтитры\s+делал",
+                r"субтитры\s+подогнал",
+                r"субтитры\s+сделал",
+                r"симон",
+                r"dima\s*torzok",
+                r"продолжение\s+следует",
+                r"пока\s+пока",
+                r"amara\.org",
+                r"qtss",
+                r"zeoranger",
+                # Добавьте сюда ещё фразы, если заметите
+            ]
+
+            def clean_hallucinations(text: str) -> str:
+                """
+                Удаляет из текста известные галлюцинации.
+                Возвращает очищенный текст (может быть пустым).
+                """
+                cleaned = text.strip()
+
+                for pattern in HALLUCINATION_PATTERNS:
+                    # Удаляем строки, содержащие галлюцинацию (с учётом возможных пробелов/переносов)
+                    cleaned = re.sub(r'^.*' + pattern + r'.*$', '', cleaned, flags=re.IGNORECASE | re.MULTILINE)
+                    print(cleaned)
+                # Удаляем лишние пробелы и переносы строк
+                cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+                print(cleaned)
+                return cleaned
+
+            # Ваш код с обработкой
             with open(temp_file_path, 'rb') as audio_file:
                 transcript = self.client.audio.transcriptions.create(
                     model="whisper-1",
                     file=audio_file,
-                    language="ru"  # Русский язык по умолчанию
+                    language="ru",
                 )
 
-            transcription = transcript.text
+                raw_text = transcript.text.strip()
+
+                # Очищаем от галлюцинаций
+                cleaned_text = clean_hallucinations(raw_text)
+
+                # Проверяем, остался ли осмысленный текст
+                if not cleaned_text or len(cleaned_text) < 5:  # можно настроить порог
+                    transcription = "Не получилось распознать голос"
+                else:
+                    transcription = cleaned_text
             language = getattr(transcript, 'language', 'ru')
 
             logger.info(f"✅ Транскрибация завершена: {len(transcription)} символов")

@@ -122,7 +122,10 @@ class MessageHandlers:
             transcription, language = await self.transcribe_service.transcribe(
                 update, context, message_type
             )
-
+            if transcription == "Не получилось распознать голос":
+                await update.message.reply_text(
+                    f"🤐 голос не распознан\n🎙@{user.username}", parse_mode='HTML')
+                return
             if not transcription:
                 await context.bot.send_message(
                     chat_id=self.admin_ids[0],
@@ -132,6 +135,7 @@ class MessageHandlers:
 
             # Если текст короткий - отправляем как есть
             if len(transcription) < 235:
+
                 await update.message.reply_text(
             f"🗣<i>Суть:</i>\n🎙@{user.username}\n{transcription}\n", parse_mode='HTML')
                 return

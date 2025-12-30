@@ -134,6 +134,8 @@ class MessageStatsBot:
 
         self.application.add_handler(CommandHandler('weekly_summary', weekly_summary_command))
         setup_weekly_scheduler(self.application)
+        self.application.add_handler(CallbackQueryHandler(self.button_handlers._handle_priority_button, pattern="^priority_"))
+
 
         logger.info("✅ Обработчики зарегистрированы")
 
