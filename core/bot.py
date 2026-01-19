@@ -47,7 +47,7 @@ class MessageStatsBot:
 
         job_queue.run_daily(
             callback=self.daily_stats_handlers.scheduled_daily_stats,
-            time=datetime.time(hour=0, minute=1, tzinfo=tz),
+            time=datetime.time(hour=9, minute=33, tzinfo=tz),
             name='daily_stats_job'
         )
 

@@ -2,6 +2,7 @@
 # HANDLERS/DAILY_STATS_HANDLER.PY - Команда для статистики
 # ============================================================
 
+import json
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -70,21 +71,46 @@ class DailyStatsHandlers:
             logger.info("🔔 Отправляю запланированную ежедневную статистику...")
 
             # Собираем статистику
-            message_text = await self.stats_service.send_daily_stats(context)
+            messages = await self.stats_service.send_daily_stats(context)
 
-            if message_text:
+            normalized_messages = []
+            if isinstance(messages, str):
+                try:
+                    messages = json.loads(messages)
+                except Exception:
+                    messages = [messages]
+
+            if isinstance(messages, (list, tuple)):
+                for message_text in messages:
+                    if not message_text:
+                        continue
+                    if isinstance(message_text, str):
+                        fixed_text = message_text
+                        if fixed_text.lstrip().startswith('"') and "\\u" in fixed_text:
+                            try:
+                                fixed_text = json.loads(fixed_text)
+                            except Exception:
+                                pass
+                        normalized_messages.append(fixed_text)
+                    else:
+                        normalized_messages.append(str(message_text))
+            else:
+                normalized_messages = [str(messages)]
+
+            if normalized_messages:
                 # Отправляем каждому администратору
                 for admin_id in self.admin_ids:
-                    try:
-                        await context.bot.send_message(
-                            chat_id=admin_id,
-                            text=message_text,
-                            parse_mode='Markdown'
-                        )
-                        logger.info(f"✅ Статистика отправлена админу {admin_id}")
+                    for message_text in normalized_messages:
+                        try:
+                            await context.bot.send_message(
+                                chat_id=admin_id,
+                                text=message_text,
+                                parse_mode='HTML'
+                            )
+                            logger.info(f"✅ Статистика отправлена админу {admin_id}")
 
-                    except Exception as e:
-                        logger.error(f"❌ Ошибка при отправке админу {admin_id}: {e}")
+                        except Exception as e:
+                            logger.error(f"❌ Ошибка при отправке админу {admin_id}: {e}")
             else:
                 logger.warning("⚠️ Статистика пуста")
 
