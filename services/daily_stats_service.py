@@ -1,9 +1,13 @@
 import logging
 import sqlite3
 import html
+import logging
+import sqlite3
+import html
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple
 from config import DATABASE_PATH
+from models.database import get_user_flow_stats
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +18,7 @@ class DailyStatsService:
     def __init__(self):
         self.database_path = 'chat_stats.db'
 
-    async def get_daily_stats(self) -> Dict[int, Dict]:
+    async def get_daily_stats(self) -> Tuple[Dict[int, Dict], Dict]:
         """
         📊 Получить статистику за последние 24 часа по каждому чату
         Исправлено: формат даты и подсчет суммы сообщений
@@ -31,6 +35,9 @@ class DailyStatsService:
             logger.info(f"📊 Собираю статистику за период: {start_str} - {end_str}")
 
             stats_by_chat = {}
+            
+            # Получаем статистику по пользователям (глобальную)
+            user_flow = get_user_flow_stats(hours=24)
 
             with sqlite3.connect(self.database_path) as conn:
                 cursor = conn.cursor()
@@ -91,11 +98,11 @@ class DailyStatsService:
                             'period_end': end_time.strftime("%Y-%m-%d %H:%M")
                         }
 
-            return stats_by_chat
+            return stats_by_chat, user_flow
 
         except Exception as e:
             logger.error(f"❌ Ошибка при получении статистики: {e}")
-            return {}
+            return {}, {}
 
     def _get_message_type_counts(self, cursor, chat_id: int, user_id: int,
                                  start_str: str, end_str: str) -> Tuple[int, int]:
@@ -135,15 +142,25 @@ class DailyStatsService:
             return 0, 0
 
 
-    def format_stats_message(self, stats_by_chat: Dict[int, Dict]) -> List[str]:
+    def format_stats_message(self, stats_by_chat: Dict[int, Dict], user_flow: Dict) -> List[str]:
         """
         📝 Форматировать статистику в текст для отправки
-        Возвращает список сообщений (по одному на чат)
+        Возвращает список сообщений (по одному на чат) + статистика по пользователям
         """
         finaly_messages = []
 
+        # Формируем сообщение со статистикой пользователей
+        if user_flow:
+            flow_msg = "👥 <b>Движение пользователей (за 24ч):</b>\n"
+            flow_msg += f"➕ Пришло: {user_flow.get('new_users', 0)}\n"
+            flow_msg += f"➖ Ушло: {user_flow.get('left_users', 0)}\n"
+            flow_msg += f"📊 Всего активных: {user_flow.get('total_active', 0)}\n"
+            # flow_msg += f"👻 Всего ушедших: {user_flow.get('total_left', 0)}\n"
+            finaly_messages.append(flow_msg)
+
         if not stats_by_chat:
-            return ["📭 За последние 24 часа не было активности"]
+            finaly_messages.append("📭 За последние 24 часа не было активности в чатах")
+            return finaly_messages
 
         # Статистика по каждому чату
         for chat_id, stats in sorted(stats_by_chat.items()):
@@ -152,7 +169,7 @@ class DailyStatsService:
             users_count = len(stats['users_stats'])
 
             message = f"Активность <b>{chat_name}</b> (ID:{chat_id}) за {datetime.now().date()}\n"
-            message += f"💬 Сообщений: {total_messages} | 👥 Пользователей: {users_count}\n\n"
+            message += f"💬 Сообщений: {total_messages} | 👥 Активных писателей: {users_count}\n\n"
 
             # Топ активных пользователей в чате
             message += "<b>Активные пользователи:</b>\n"
@@ -196,12 +213,12 @@ class DailyStatsService:
             logger.info("🔔 Начинаю отправку ежедневной статистики...")
 
             # Собираем статистику
-            stats = await self.get_daily_stats()
+            stats, user_flow = await self.get_daily_stats()
 
             # Форматируем сообщение
-            messages = self.format_stats_message(stats)
+            messages = self.format_stats_message(stats, user_flow)
 
-            logger.info(f"✅ Сообщения готовы ({len(messages)} чатов)")
+            logger.info(f"✅ Сообщения готовы ({len(messages)} частей)")
 
             return messages
 

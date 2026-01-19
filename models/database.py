@@ -4,7 +4,7 @@
 
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List, Tuple
 from config import DATABASE_PATH
 from utils.tiktok import count_tokens
@@ -89,6 +89,7 @@ def init_database():
             user_group_id INTEGER,
             users_rights TEXT DEFAULT 'User',
             user_priority INTEGER DEFAULT 0,
+            is_attend INTEGER DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -102,7 +103,7 @@ def init_database():
 # ============================================================
 
 def add_user(user, chat):
-    """Добавить пользователя в БД"""
+    """Добавить пользователя в БД или обновить статус если вернулся"""
 
     try:
         with sqlite3.connect(DATABASE_PATH) as conn:
@@ -117,8 +118,16 @@ def add_user(user, chat):
                     telegram_can_read_all_group_messages,
                     telegram_supports_inline_queries,
                     telegram_added_to_attachment_menu,
-                    user_group_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    user_group_id, is_attend
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                ON CONFLICT(telegram_id) DO UPDATE SET
+                    is_attend = 1,
+                    updated_at = CURRENT_TIMESTAMP,
+                    user_group_id = excluded.user_group_id,
+                    user_name = excluded.user_name,
+                    telegram_username = excluded.telegram_username,
+                    telegram_first_name = excluded.telegram_first_name,
+                    telegram_last_name = excluded.telegram_last_name
             """, (
                 user.id,
                 user.username or '',
@@ -137,9 +146,6 @@ def add_user(user, chat):
 
             conn.commit()
 
-    except sqlite3.IntegrityError:
-        # Пользователь уже существует
-        pass
     except Exception as e:
         print(f"❌ Ошибка при добавлении пользователя: {e}")
 
@@ -158,18 +164,18 @@ def user_exists(user_id: int) -> bool:
 
 
 def mark_user_as_left(user_id: int, chat_id: int):
-    """Отметить пользователя как покинувшего чат"""
+    """Отметить пользователя как покинувшего чат (is_attend = 0)"""
 
     try:
         with sqlite3.connect(DATABASE_PATH) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "DELETE FROM users WHERE telegram_id = ? AND user_group_id = ?",
-                (user_id, chat_id)
+                "UPDATE users SET is_attend = 0, updated_at = CURRENT_TIMESTAMP WHERE telegram_id = ?",
+                (user_id,)
             )
             conn.commit()
     except Exception as e:
-        print(f"❌ Ошибка при удалении пользователя: {e}")
+        print(f"❌ Ошибка при обновлении статуса пользователя: {e}")
 
 
 def user_edit(user_id: int, chat_id: int):
@@ -238,6 +244,64 @@ def count_users() -> int:
     except Exception as e:
         print(f"❌ Ошибка при подсчёте пользователей: {e}")
         return 0
+
+
+def get_user_flow_stats(hours: int = 24) -> dict:
+    """
+    📊 Получить статистику по приходу/уходу пользователей
+    
+    Returns:
+        {
+            'new_users': int,    # Пришло за период
+            'left_users': int,   # Ушло за период
+            'total_active': int, # Всего активных
+            'total_left': int    # Всего ушедших
+        }
+    """
+    try:
+        with sqlite3.connect(DATABASE_PATH) as conn:
+            cursor = conn.cursor()
+            
+            # Вычисляем время начала периода
+            start_time = datetime.now() - timedelta(hours=hours)
+            start_str = start_time.strftime("%Y-%m-%d %H:%M:%S")
+
+            # Новые пользователи (created_at >= start_time)
+            # Примечание: учитываем только активных или всех? Обычно joined - это факт регистрации.
+            cursor.execute("""
+                SELECT COUNT(*) FROM users 
+                WHERE created_at >= ?
+            """, (start_str,))
+            new_users = cursor.fetchone()[0]
+
+            # Ушедшие за период (is_attend=0 AND updated_at >= start_time)
+            cursor.execute("""
+                SELECT COUNT(*) FROM users 
+                WHERE is_attend = 0 AND updated_at >= ?
+            """, (start_str,))
+            left_users = cursor.fetchone()[0]
+
+            # Всего активных
+            cursor.execute("SELECT COUNT(*) FROM users WHERE is_attend = 1")
+            total_active = cursor.fetchone()[0]
+
+            # Всего ушедших
+            cursor.execute("SELECT COUNT(*) FROM users WHERE is_attend = 0")
+            total_left = cursor.fetchone()[0]
+
+            return {
+                'new_users': new_users,
+                'left_users': left_users,
+                'total_active': total_active,
+                'total_left': total_left
+            }
+
+    except Exception as e:
+        print(f"❌ Ошибка при получении статистики по пользователям: {e}")
+        return {
+            'new_users': 0, 'left_users': 0, 
+            'total_active': 0, 'total_left': 0
+        }
 
 
 # ============================================================
