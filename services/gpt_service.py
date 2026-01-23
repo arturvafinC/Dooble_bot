@@ -60,8 +60,9 @@ class GPTService:
                 ]
             )
 
-            summary = response.choices[0].message.content.strip()
-
+            content = response.choices[0].message.content
+            summary = (content or "").strip()
+            print(summary)
             # Если ответ пустой - логируем
             if not summary or len(summary) == 0:
                 logger.warning("⚠️ GPT вернул пустой ответ (возможно, только кредиты/авторы)")

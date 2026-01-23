@@ -17,6 +17,16 @@ from handlers.get_weekly_context_handler import setup_weekly_scheduler, weekly_s
 from services.context_cache_service import init_context_tables, update_context_tables_allow_null
 
 
+from telegram.request import HTTPXRequest
+
+# Настраиваем запросы с увеличенными таймаутами
+# connect_timeout - время на подключение к серверу
+# read_timeout - время на ожидание ответа (важно для загрузки видео)
+request = HTTPXRequest(
+    connect_timeout=20.0,
+    read_timeout=60.0,  # Увеличили до 60 секунд для тяжелых файлов
+    write_timeout=60.0
+)
 logger = logging.getLogger(__name__)
 
 
@@ -47,7 +57,7 @@ class MessageStatsBot:
 
         job_queue.run_daily(
             callback=self.daily_stats_handlers.scheduled_daily_stats,
-            time=datetime.time(hour=9, minute=33, tzinfo=tz),
+            time=datetime.time(hour=0, minute=1, tzinfo=tz),
             name='daily_stats_job'
         )
 
@@ -144,7 +154,7 @@ class MessageStatsBot:
         logger.info("🔨 Инициализирую приложение...")
 
         # Создаем Application
-        self.application = Application.builder().token(self.token).build()
+        self.application = Application.builder().token(self.token).request(request).build()
 
         # Регистрируем обработчики
         self._register_handlers()

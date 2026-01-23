@@ -139,11 +139,10 @@ class MessageHandlers:
                 await update.message.reply_text(
             f"🗣<i>Суть:</i>\n🎙@{user.username}\n{transcription}\n", parse_mode='HTML')
                 return
-
             # Если текст длинный - сокращаем через GPT
             context_summary = await self.gpt_service.summarize(transcription, duration)
-            text_to_count_tokens = transcription + context_summary
             if context_summary:
+                text_to_count_tokens = transcription + context_summary
                 # Сохраняем транскрибацию и сокращение в БД
                 self._update_transcription_in_db(
                     message.message_id,
@@ -152,15 +151,15 @@ class MessageHandlers:
                     context_summary,
                     count_tokens(text_to_count_tokens)
                 )
-
+                print(1)
+                print(context_summary, type(context_summary))
                 await update.message.reply_text(
             f"🗣<i>Суть:</i>\n{context_summary} <blockquote expandable>🎙@{user.username}\n<i>Полный текст свернут ниже</i> \n\n{transcription}\n\n</blockquote>",
             parse_mode='HTML')
             else:
-                await context.bot.send_message(
-                    chat_id=self.admin_ids[0],
-                    text='❌ Ошибка при обработке GPT'
-                )
+                print(2)
+                await update.message.reply_text(
+            f"🗣<i>Суть:</i>\n🎙@{user.username}\n{transcription}\n", parse_mode='HTML')
 
         except Exception as e:
             logger.error(f"❌ Ошибка при обработке медиа: {e}")

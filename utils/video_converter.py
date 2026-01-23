@@ -2,8 +2,31 @@ import subprocess
 import tempfile
 import os
 import logging
+import shutil
 
 logger = logging.getLogger(__name__)
+
+
+def get_ffmpeg_path():
+    """Find ffmpeg executable."""
+    # 1. Check system PATH
+    path = shutil.which('ffmpeg')
+    if path:
+        return path
+    
+    # 2. Check common paths (macOS, Linux)
+    common_paths = [
+        '/opt/homebrew/bin/ffmpeg',
+        '/usr/local/bin/ffmpeg',
+        '/usr/bin/ffmpeg',
+        '/bin/ffmpeg'
+    ]
+    
+    for p in common_paths:
+        if os.path.exists(p) and os.access(p, os.X_OK):
+            return p
+            
+    return 'ffmpeg'  # Default fallback
 
 
 def convert_video_to_audio_api(video_input):
@@ -20,6 +43,8 @@ def convert_video_to_audio_api(video_input):
     temp_audio_path = None
 
     try:
+        ffmpeg_cmd = get_ffmpeg_path()
+        
         # Если это bytes - пишем в временный файл
         if isinstance(video_input, bytes):
             with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as temp_video:
@@ -38,7 +63,7 @@ def convert_video_to_audio_api(video_input):
 
         # FFmpeg конвертация
         cmd = [
-            'ffmpeg', '-y', '-i', temp_video_path,
+            ffmpeg_cmd, '-y', '-i', temp_video_path,
             '-vn', '-ar', '16000', '-ac', '1',
             temp_audio_path
         ]
