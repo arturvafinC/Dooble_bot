@@ -1,7 +1,3 @@
-# ============================================================
-# HANDLERS/DAILY_STATS_HANDLER.PY - Команда для статистики
-# ============================================================
-
 import json
 import logging
 from telegram import Update

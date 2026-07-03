@@ -1,7 +1,3 @@
-# ============================================================
-# HANDLERS/BUTTON_HANDLERS.PY - Обработчики callback кнопок
-# ============================================================
-
 import logging
 import sqlite3
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -441,58 +437,6 @@ class ButtonHandlers:
             logger.error(f"❌ Ошибка в _handle_page_button: {e}")
             await query.edit_message_text(f"❌ Ошибка: {str(e)[:100]}")
 
-
-    # async def _handle_chat_button(self, query, context: ContextTypes.DEFAULT_TYPE):
-    #     """Обработчик нажатия на пользователя"""
-    #
-    #     try:
-    #         chat_id = int(query.data.split(':')[1])
-    #
-    #         # Получаем информацию о пользователе
-    #         with sqlite3.connect(DATABASE_PATH) as conn:
-    #             cursor = conn.cursor()
-    #             cursor.execute("""
-    #                 SELECT chat_name, table_name, created_at
-    #                 FROM chats_registry WHERE chat_id = ?
-    #             """, (chat_id,))
-    #
-    #             result = cursor.fetchone()
-    #
-    #         if not result:
-    #             await query.edit_message_text("❌ таблица не найдена")
-    #             return
-    #
-    #         chat_name, table_name, created_ats = result
-    #
-    #         text = (
-    #             "Информация о чате:\n\n"
-    #             f"ID: {chat_id}\n"
-    #             f"Имя: {chat_name or 'N/A'}\n"
-    #             f"Таблица: {table_name or 'N/A'}\n"
-    #             f"Создан: {created_ats or 'N/A'}\n\n"
-    #             "Действия:\n"
-    #         )
-    #
-    #         # Формируем кнопки в зависимости от текущих прав
-    #         keyboard = []
-    #
-    #
-    #
-    #         keyboard.append([InlineKeyboardButton("📊 Получить недельный контекст", callback_data=f"chat_context:{chat_id}")])
-    #
-    #         keyboard.append([
-    #             InlineKeyboardButton("« Назад", callback_data="chat_page:0")
-    #         ])
-    #
-    #         await query.edit_message_text(
-    #             text,
-    #             reply_markup=InlineKeyboardMarkup(keyboard)
-    #         )
-    #
-    #     except Exception as e:
-    #         logger.error(f"❌ Ошибка в _handle_user_button: {e}")
-    #         await query.edit_message_text(f"❌ Ошибка: {str(e)[:100]}")
-
     async def _handle_chat_context(self, query, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Получает и выводит недельный контекст чата"""
         try:
@@ -661,7 +605,6 @@ class ButtonHandlers:
         except Exception as e:
             logger.error(f"❌ Ошибка в _handle_priority_button: {e}")
             await query.answer(f"❌ Ошибка: {str(e)[:100]}", show_alert=True)
-
 
 
 

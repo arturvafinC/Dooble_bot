@@ -1,7 +1,3 @@
-# ============================================================
-# HANDLERS/MESSAGE_HANDLERS.PY - Обработчики сообщений (голос, видео, текст)
-# ============================================================
-
 import logging
 import sqlite3
 from datetime import datetime
@@ -290,39 +286,6 @@ class MessageHandlers:
 
         except Exception as e:
             logger.error(f"❌ Ошибка при обработке покинувшего участника: {e}")
-
-    # async def handle_bot_added_to_group(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-    #     """Обработчик - бот добавлен в группу (синхронизация администраторов)"""
-    #
-    #     try:
-    #         if not update.message.new_chat_members:
-    #             return
-    #
-    #         for member in update.message.new_chat_members:
-    #             # Если это наш бот
-    #             if member.is_bot and member.id == context.bot.id:
-    #                 chat = update.message.chat
-    #                 chat_name = chat.title or f"chat_{chat.id}"
-    #
-    #                 # Получаем администраторов и добавляем их
-    #                 administrators = await context.bot.get_chat_administrators(chat.id)
-    #                 for admin in administrators:
-    #                     user = admin.user
-    #
-    #                     if not user_exists(user.id):
-    #                         add_user(user, chat)
-    #                     else:
-    #                         user_edit(user.id, chat.id)
-    #
-    #                 await context.bot.send_message(
-    #                     chat_id=chat.id,
-    #                     text=f"✅ Бот добавлен! Синхронизированы участники группы '{chat_name}'"
-    #                 )
-    #                 logger.info(f"✅ Бот добавлен в группу: {chat_name}")
-    #
-    #     except Exception as e:
-    #         logger.error(f"❌ Ошибка при обработке добавления бота: {e}")
-
     async def update_edited_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик отредактированных сообщений"""
 

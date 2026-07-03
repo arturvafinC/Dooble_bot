@@ -1,7 +1,3 @@
-# ============================================================
-# MODELS/DATABASE.PY - Все операции с БД (из data_base.py)
-# ============================================================
-
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta

@@ -1,6 +1,3 @@
-# ============================================================
-# MAIN.PY - Точка входа приложения (ТОЛЬКО инициализация)
-# ============================================================
 from openai import OpenAI
 import logging
 from config import TELEGRAM_BOT_TOKEN, ADMIN_IDS, validate_config, OPENAI_API_KEY
@@ -22,7 +19,7 @@ def main():
         logger.error("❌ Ошибка конфигурации. Проверьте .env файл")
         exit(1)
     if not OPENAI_API_KEY:
-        logger.error('OPEN AI KEY IS SPECIFIED! CHECK ENV FILE')
+        logger.error("OpenAI API key is not specified. Check .env file")
     logger.info("🚀 Запуск бота...")
 
     # Создаем и запускаем бот

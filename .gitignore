@@ -1,7 +1,31 @@
-.env/
-.idea/
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
 .venv/
 .venv1/
-waste_files/transcribate_test.py/
-chat_stats/chat_stats.db/
+venv/
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+
+# Runtime data
+*.db
+*.sqlite
+*.sqlite3
+logs/
+
+# Local scratch files
 waste_files/

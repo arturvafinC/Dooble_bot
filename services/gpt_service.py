@@ -1,7 +1,3 @@
-# ============================================================
-# SERVICES/GPT_SERVICE.PY - Обработка текста через ChatGPT
-# ============================================================
-
 import logging
 from typing import Optional
 from openai import OpenAI
@@ -11,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 class GPTService:
-    """Сервис для обработки текста через ChatGPT"""
+    """Сервис для обработки и сокращения текста"""
 
     def __init__(self):
         self.client = OpenAI(api_key=OPENAI_API_KEY)
@@ -24,7 +20,7 @@ class GPTService:
             duration: Optional[int] = None
     ) -> Optional[str]:
         """
-        🤖 Сокращение текста через ChatGPT
+        Сокращение текста
 
         Преобразует длинную транскрибацию в одну строку - суть
 
@@ -41,7 +37,7 @@ class GPTService:
             return None
 
         try:
-            logger.info(f"🤖 Отправляю текст на обработку GPT ({len(text)} символов)...")
+            logger.info(f"Отправляю текст на обработку ({len(text)} символов)...")
 
             # Выбираем модель в зависимости от длины текста
             model = self._select_model_by_length(len(text))

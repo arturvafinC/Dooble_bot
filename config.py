@@ -1,7 +1,3 @@
-# ============================================================
-# CONFIG.PY - Централизованная конфигурация приложения
-# ============================================================
-
 import os
 from dotenv import load_dotenv
 
@@ -10,7 +6,11 @@ load_dotenv()
 
 # 🔐 TELEGRAM BOT
 TELEGRAM_BOT_TOKEN = os.getenv("TOKEN")
-ADMIN_IDS = [2089290492, 112758382]
+ADMIN_IDS = [
+    int(admin_id.strip())
+    for admin_id in os.getenv("ADMINS", "").split(",")
+    if admin_id.strip()
+]
 
 # 🤖 OPENAI API
 OPENAI_API_KEY = os.getenv("API_WHISPER")
@@ -46,7 +46,7 @@ GPT_PROMPT = os.getenv("PROMT", '''Ты — помощник, задача ко�
 
 
 
-WEEKLY_PROMT = '''You are an AI assistant tasked with analyzing user messages from the past week and creating a comprehensive summary. Your goal is to provide administrators with a clear understanding of what the user discussed without them needing to read the entire conversation history.
+WEEKLY_PROMT = '''Analyze user messages from the past week and create a comprehensive summary. The goal is to provide administrators with a clear understanding of what the user discussed without them needing to read the entire conversation history.
 
 Instructions:
 1. Analyze all provided messages carefully
@@ -78,7 +78,7 @@ LOG_FILES_DIR = "../logs/"
 # ⚙️ VALIDATION
 def validate_config():
     """Проверка обязательных переменных окружения"""
-    required = ["TOKEN", "API_WHISPER"]
+    required = ["TOKEN", "API_WHISPER", "ADMINS"]
     missing = [var for var in required if not os.getenv(var)]
     
     if missing:

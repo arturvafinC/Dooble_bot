@@ -1,7 +1,3 @@
-# ============================================================
-# CORE/BOT.PY - Инициализация Telegram Application и регистрация обработчиков
-# ============================================================
-
 import logging
 from telegram.ext import Application, MessageHandler, CommandHandler, CallbackQueryHandler, filters
 from models.database import init_database

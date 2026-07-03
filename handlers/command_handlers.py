@@ -1,7 +1,3 @@
-# ============================================================
-# HANDLERS/COMMAND_HANDLERS.PY - Команды бота (/stats, /export и т.д.)
-# ============================================================
-
 import logging
 import sqlite3
 from datetime import datetime
