@@ -66,14 +66,14 @@ Instructions:
 User messages from the past week:
 '''
 # 📊 DATABASE
-DATABASE_PATH = "chat_stats.db"
+DATABASE_PATH = os.getenv("DATABASE_PATH", "chat_stats.db")
 
 # 🔗 FIBERY
 FIBERY_API_KEY = os.getenv('FIBERY_API_TOKEN')
 FIBERY_ACCOUNT_NAME = os.getenv('FIBERY_ACCOUNT_NAME')
 
 # 📋 LOGGING
-LOG_FILES_DIR = "../logs/"
+LOG_FILES_DIR = os.getenv("LOG_FILES_DIR", "logs/")
 
 # ⚙️ VALIDATION
 def validate_config():

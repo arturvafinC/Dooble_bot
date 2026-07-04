@@ -6,12 +6,13 @@ from datetime import datetime
 import sys
 from loguru import logger
 
-LOG_FILES_DIR = "../logs/"
+LOG_FILES_DIR = os.getenv("LOG_FILES_DIR", "logs/")
+os.makedirs(LOG_FILES_DIR, exist_ok=True)
 sys.stdout.reconfigure(encoding='utf-8')
 
 format = "{time} {level} {message}"
 
-logger.add(LOG_FILES_DIR + "debug-{time}.log.json", format=format, level="DEBUG", rotation="10 MB", compression="zip", serialize=True)
+logger.add(os.path.join(LOG_FILES_DIR, "debug-{time}.log.json"), format=format, level="DEBUG", rotation="10 MB", compression="zip", serialize=True)
 logger.add(sys.stderr, level="WARNING")
 
 # send a POST request to https://YOUR_ACCOUNT.fibery.io/api/commands endpoint
